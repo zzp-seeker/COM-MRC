@@ -1,5 +1,5 @@
 # COM-MRC
-EMNLP 2022 主会论文 ASTE任务  COM-MRC代码
+EMNLP 2022 主会论文 ASTE任务  COM-MRC代码 
 
 COM-MRC: A COntext-Masked Machine Reading Comprehension Framework for Aspect Sentiment Triplet Extraction
 
