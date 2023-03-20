@@ -23,14 +23,14 @@ parser.add_argument('--device', type=str, default="cuda:0")
 parser.add_argument('--train_epochs', type=int, default=100)
 parser.add_argument('--seed', type=int, default=2025)
 parser.add_argument('--data_dir',type=str,
-                    default='../Dataset/ASTE-Data-V2/14lap')
+                    default='../Dataset/ASTE-Data-V2/14lap') # 数据集路径
 parser.add_argument('--cache_path', type=str,
                     default="../main_cache",
                     help='pretrained bert model cache path')
 parser.add_argument('--bert_type', type=str,default="bert-base-uncased",)
 parser.add_argument("--lr", type=float, default=9e-5)
-parser.add_argument('--use_query', type=int, default=1)
-parser.add_argument('--use_context_augmentation', type=int, default=-1)
+parser.add_argument('--use_query', type=int, default=1) # 是否使用query
+parser.add_argument('--use_context_augmentation', type=int, default=1) # -1:不增强 0:线性增强 1:指数增强
 parser.add_argument('--a', type=float, default=5) # inference parameter
 parser.add_argument('--a_ww', type=float, default=0.5)
 parser.add_argument('--b', type=float, default=11)

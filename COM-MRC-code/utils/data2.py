@@ -194,6 +194,7 @@ class DataLoader:
                     r[args.sen_pre_len+index]=term2id['I']
         return r
 
+    # 二进制：指数级数据增强判定
     def get_all_bin(self,l):
         if l<0: return -1
         r = []

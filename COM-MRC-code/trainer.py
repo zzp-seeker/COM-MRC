@@ -85,8 +85,7 @@ def train(args,train_data_loader,dev_data_loader,test_data_loader,three_goden_se
         logger.info(f"s_loss_sum:{torch.sum(torch.stack(s_loss_sum)).item()}")
         logger.info(f"time:{time.time()-t_s}")
 
-        if i>15:
-
+        if i>15: 
             as_f,p_f,t_f = test(args,model,dev_data_loader,three_goden_set_dev,logger,is_test=False)
             if t_f >= best_t_f1_dev:
                 logger.info(f'saved {i}th model')
@@ -275,8 +274,8 @@ def test(args,model,test_data_loader,three_goden_set,logger,is_test=False,model_
 
     # logger.info("aspect p,r,f1: " + '%.5f'%a_p +' '+ '%.5f'%a_r +' '+ '%.5f'%a_f)
     # logger.info("opinion p,r,f1: " + '%.5f'%o_p +' '+ '%.5f'%o_r +' '+ '%.5f'%o_f)
-    logger.info("multi a p,r,f1: " + '%.5f'%mt_p +' '+ '%.5f'%mt_r +' '+ '%.5f'%mt_f)
-    logger.info("single a p,r,f1: " + '%.5f'%st_p +' '+ '%.5f'%st_r +' '+ '%.5f'%st_f)
+    logger.info("multi a p,r,f1: " + '%.5f'%mt_p +' '+ '%.5f'%mt_r +' '+ '%.5f'%mt_f) # 多方面词指标
+    logger.info("single a p,r,f1: " + '%.5f'%st_p +' '+ '%.5f'%st_r +' '+ '%.5f'%st_f) # 单方面词指标
     logger.info("triplets p,r,f1: " + '%.5f'%t_p +' '+ '%.5f'%t_r +' '+ '%.5f'%t_f)
 
 
@@ -331,121 +330,5 @@ def score_set(predict_set , golden_set):
     f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
     return precision, recall, f1
 
-# inference algorithm 1
-def test2(args,model,test_data_loader,three_goden_set,logger,is_test=False,model_dir=''):
 
-    model.eval()
-    if is_test:
-        # model.load_state_dict(torch.load(model_dir, map_location={'cuda:2': 'cuda:3'}))
-        model.load_state_dict(torch.load(model_dir))
-    aspect_set,opinion_set,triplets_set = set(),set(),set()
-    multi_set,single_set = set(),set()
-    multi_aspect_id = three_goden_set[2][3]
-    with torch.no_grad():
-
-        for i,batch in enumerate(test_data_loader):
-            is_on,count = True,0
-            inputs_plus,sentence_token_range = batch['inputs_plus_for_test'],batch['sentence_token_range'][0]
-            extra_info = batch['extra_info']
-            S = inputs_plus['input_ids'].size(1)
-
-            token2word_idx = [] # token2word_idx['token_idx']=word_idx
-            for ii,t in enumerate(sentence_token_range):
-                for j in range(t[0],t[1]+1):
-                    token2word_idx.append(ii)
-
-            if is_test:
-                logger.info(f'{i}-th golden:{three_goden_set[-1][str(i)]}')
-
-            se_r = []
-            inputs_plus_clone = copy.deepcopy(inputs_plus)
-            # inputs_plus_clone = inputs_plus.clone()
-            while is_on:
-                plus = model.get_aspect(inputs_plus_clone,args)
-                as_p,ae_p,_,_,_ = plus
-
-                # a_spans =  logits2aspect_aspect(as_p.squeeze(),ae_p.squeeze(),3,1,4,0.5,4,token2word_idx,is_test,i)
-                a_spans = logits2aspect(as_p.squeeze(),ae_p.squeeze(),3,1,args.a,args.a_ww,args.a,token2word_idx,is_test)
-
-
-                if len(a_spans)==0:
-                    is_on = False
-                else:
-
-
-                    as_input = torch.tensor([0] * (S-args.sen_pre_len)).unsqueeze(0).to(args.device)
-                    as_input[0][a_spans[0][0]]=1
-                    ae_input = torch.tensor([0] * (S-args.sen_pre_len)).unsqueeze(0).to(args.device)
-                    ae_input[0][a_spans[0][1]]=1
-
-                    y = model(inputs_plus_clone,as_input,ae_input,args,plus)
-                    is_on_logits = y['is_on_logits']
-
-                    if count!=0:
-                        is_on = torch.argmax(is_on_logits,dim=1).squeeze().item()==1
-                        if not is_on:
-                            break
-
-
-                    # se_r  = f_join((a_spans[0][0],a_spans[0][1]),se_r)
-
-
-                    if args.use_c == 1:
-                        se_r  = f_join((a_spans[0][0],a_spans[0][1]),se_r)
-                    else:
-                        se_r.append((a_spans[0][0],a_spans[0][1]))
-
-                    inputs_plus_clone['attention_mask'][0][args.sen_pre_len+a_spans[0][0]:args.sen_pre_len+a_spans[0][1]+1]=0
-                    count += 1
-
-                    if count>10:
-                        break
-
-            for a_spans in se_r:
-                as_input = torch.tensor([0] * (S-args.sen_pre_len)).unsqueeze(0).to(args.device)
-                as_input[0][a_spans[0]]=1
-                ae_input = torch.tensor([0] * (S-args.sen_pre_len)).unsqueeze(0).to(args.device)
-                ae_input[0][a_spans[1]]=1
-
-                y = model(inputs_plus,as_input,ae_input,args)
-                os_p,oe_p,s_logits = y['os_p'],y['oe_p'],y['s_logits']
-
-                a_span =  get_aspect(i,a_spans[0],a_spans[1],sentence_token_range)
-                aspect_set.add(a_span)
-
-
-                # o_spans = logits2aspect(os_p.squeeze(),oe_p.squeeze(),3,3,5,1,5,token2word_idx,is_test)
-                o_spans = logits2aspect(os_p.squeeze(),oe_p.squeeze(),3,3,args.b,args.b_ww,args.b,token2word_idx,is_test)
-
-                o_spans = get_opinion_spans(i,o_spans,sentence_token_range)
-                for o in o_spans:
-                    opinion_set.add(o)
-
-                s = torch.argmax(s_logits,dim=1).squeeze().item()
-                as_pair,pair,triplets = get_as_pair_and_triplets(a_span,o_spans,s)
-
-                for t in triplets:
-                    triplets_set.add(t)
-                    if i in multi_aspect_id:
-                        multi_set.add(t)
-                    else:
-                        single_set.add(t)
-
-                if is_test:
-                    logger.info(f'a_span:{a_span}')
-                    logger.info(f'o_spans:{o_spans}')
-                    logger.info(f'triplets:{triplets}')
-
-                inputs_plus['attention_mask'][0][args.sen_pre_len+a_spans[0]:args.sen_pre_len+a_spans[1]+1]=0
-
-    t_p, t_r, t_f = score_set(triplets_set,three_goden_set[2][0])
-    mt_p,mt_r,mt_f = score_set(multi_set,three_goden_set[2][1])
-    st_p,st_r,st_f = score_set(single_set,three_goden_set[2][2])
-
-    logger.info("multi a p,r,f1: " + '%.5f'%mt_p +' '+ '%.5f'%mt_r +' '+ '%.5f'%mt_f)
-    logger.info("single a p,r,f1: " + '%.5f'%st_p +' '+ '%.5f'%st_r +' '+ '%.5f'%st_f)
-    logger.info("triplets p,r,f1: " + '%.5f'%t_p +' '+ '%.5f'%t_r +' '+ '%.5f'%t_f)
-
-
-    return mt_f,st_f,t_f
 
